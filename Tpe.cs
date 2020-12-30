@@ -375,6 +375,10 @@ namespace Nni {
             double[] weights = Enumerable.Repeat(1.0, n).ToArray();
             double rampStart = 1.0 / n;
             int rampLength= n - lf;
+            if (rampLength == 1) {
+                weights[0] = rampStart;
+                return weights;
+            }
             for (int i = 0; i < rampLength; i++) {
                 weights[i] = rampStart + (1.0 - rampStart) / (rampLength - 1) * i;
             }
