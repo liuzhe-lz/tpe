@@ -21,10 +21,10 @@ namespace cs
                     {
                         'model1': {
                             'batch_size': { '_type': 'quniform', '_value': [ 16, 32 ] },
-                                'conv_size': { '_type': 'choice', '_value': [ 2, 3, 5, 7 ] },
-                                'dropout_rate': { '_type': 'uniform', '_value': [ 0.5, 0.9 ] },
-                                'hidden_size': { '_type': 'qloguniform', '_value': [ 32, 1024 ] },
-                                'learning_rate': { '_type': 'loguniform', '_value': [ 0.0001, 0.1 ] }
+                            'conv_size': { '_type': 'choice', '_value': [ 2, 3, 5, 7 ] },
+                            'dropout_rate': { '_type': 'uniform', '_value': [ 0.5, 0.9 ] },
+                            'hidden_size': { '_type': 'qloguniform', '_value': [ 32, 1024 ] },
+                            'learning_rate': { '_type': 'loguniform', '_value': [ 0.0001, 0.1 ] }
                         },
                         'model2': {
                             'test1': { '_type': 'choice', '_value': [ 'a', 'b' ] },
