@@ -4,43 +4,6 @@ using System.Linq;
 
 using Newtonsoft.Json.Linq;
 
-/**
- *  Example code:
- *
- *      var space = new Dictionary<string, SearchRange>();
- *      space["batch_size"] = SearchRange.Numerical(0, 16, 32, false, true);
- *      space["conv_size"] = SearchRange.Categorical(0, 4);
- *      space["dropout_rate"] = SearchRange.Numerical(0, 0.5, 0.9, false, false);
- *      space["hidden_size"] = SearchRange.Numerical(0, 32, 1024, true, true);
- *      space["learning_rate"] = SearchRange.Numerical(0, 0.0001, 0.1, true, false);
- *      space["test1"] = SearchRange.Categorical(1, 2);
- *      space["test2"] = SearchRange.Numerical(1, 0.0, 0.1, false, false);
-
- *      var tuner = new TpeTuner(2, space);
-
- *      var rng = new Random(0);
-
- *      Parameter param = null;
-
- *      for (int i = 0; i < 100; i++) {
- *          for (int j = 0; j < 5; j++) {
- *              int idx = i * 5 + j;
- *              param = tuner.GenerateParameters(idx);
- *          }
-
- *          Console.WriteLine($"===== {i} =====");
- *          foreach (var (key, val) in param) {
- *              Console.WriteLine($"{key}: {val}");
- *          }
-
- *          for (int j = 0; j < 5; j++) {
- *              int idx = i * 5 + j;
- *              double metric = rng.NextDouble();
- *              tuner.ReceiveTrialResult(idx, metric);
- *          }
- *      }
- **/
-
 namespace Nni {
 
     class SearchRange
@@ -100,31 +63,34 @@ namespace Nni {
 
     class RandomGenerator
     {
-        private long a = 1103515245;
-        private long c = 12345;
-        private long m = (long)1 << 31;
-        public long seed;
+        //private long a = 1103515245;
+        //private long c = 12345;
+        //private long m = (long)1 << 31;
+        //public long seed;
+
+        private Random rnd = new Random();
 
         public RandomGenerator(int seed = 0)
         {
-            this.seed = seed;
+            //this.seed = seed;
         }
 
-        private long rand()
-        {
-            seed = (a * seed + c) % m;
-            return seed;
-        }
+        //private long rand()
+        //{
+        //    seed = (a * seed + c) % m;
+        //    return seed;
+        //}
 
         public int randint(int high)
         {
-            return (int)(rand() % high);
+            return rnd.Next(high);
+            //return (int)(rand() % high);
         }
 
         public double uniform(double low, double high)
         {
-            //double tmp = 1.0 / m;
-            return (double)rand() / m * (high - low) + low;
+            return rnd.NextDouble() * (high - low) + low;
+            //return (double)rand() / m * (high - low) + low;
         }
 
         public double normal(double loc, double scale)
