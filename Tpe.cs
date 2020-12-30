@@ -2,113 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-using Newtonsoft.Json.Linq;
-
-namespace Nni {
-
-    class SearchRange
-    {
-        public int groupIdx;
-        public int size;
-        public double low;
-        public double high;
-        public bool categorical;
-        public bool log;
-        public bool integer;
-
-        public static SearchRange Categorical(int groupIdx, int n)
-        {
-            return new SearchRange(groupIdx, n, Double.NaN, Double.NaN, true, false, false);
-        }
-
-        public static SearchRange Numerical(int groupIdx, double low, double high, bool log, bool integer)
-        {
-            return new SearchRange(groupIdx, -1, low, high, false, log, integer);
-        }
-
-        public SearchRange(int groupIdx, int size, double low, double high, bool categorical, bool log, bool integer)
-        {
-            this.groupIdx = groupIdx;
-            this.size = size;
-            this.low = low;
-            this.high = high;
-            this.categorical = categorical;
-            this.log = log;
-            this.integer = integer;
-
-            if (log) {
-                this.high = Math.Log(this.high);
-                this.low = Math.Log(this.low);
-            }
-        }
-    }
-
-    class Parameter : Dictionary<string, double>
-    {
-    }
+namespace Nni
+{
+    class TpeParameters : Dictionary<string, double> { }
 
     class Result
     {
         public int id;
         public double loss;
-        public Parameter param;
+        public TpeParameters param;
 
-        public Result(int id, double loss, Parameter param)
+        public Result(int id, double loss, TpeParameters param)
         {
             this.id = id;
             this.loss = loss;
             this.param = param;
-        }
-    }
-
-    class RandomGenerator
-    {
-        //private long a = 1103515245;
-        //private long c = 12345;
-        //private long m = (long)1 << 31;
-        //public long seed;
-
-        private Random rnd = new Random();
-
-        public RandomGenerator(int seed = 0)
-        {
-            //this.seed = seed;
-        }
-
-        //private long rand()
-        //{
-        //    seed = (a * seed + c) % m;
-        //    return seed;
-        //}
-
-        public int randint(int high)
-        {
-            return rnd.Next(high);
-            //return (int)(rand() % high);
-        }
-
-        public double uniform(double low, double high)
-        {
-            return rnd.NextDouble() * (high - low) + low;
-            //return (double)rand() / m * (high - low) + low;
-        }
-
-        public double normal(double loc, double scale)
-        {
-            double u = 1 - uniform(0, 1);
-            double v = 1 - uniform(0, 1);
-            double std = Math.Sqrt(-2.0 * Math.Log(u)) * Math.Sin(2.0 * Math.PI * v);
-            return loc + std * scale;
-        }
-
-        public int Categorical(double[] possibility)
-        {
-            double x = uniform(0, 1);
-            for (int i = 0; i < possibility.Length; i++) {
-                x -= possibility[i];
-                if (x < 0) { return i; }
-            }
-            return possibility.Length - 1;
         }
     }
 
@@ -121,167 +29,118 @@ namespace Nni {
         private const int nEiCandidates = 24;
         private const double eps = 1e-12;
 
-        public static RandomGenerator rng = new RandomGenerator(0);
+        public static RandomNumberGenerator rng = new RandomNumberGenerator();
 
-        private Dictionary<string, SearchRange> space;
-        private int nGroup;
+        private SearchSpace space;
         private bool minimize;
-        private Dictionary<int, Parameter> paramHistory = new Dictionary<int, Parameter>();
+        private Dictionary<int, TpeParameters> parameters = new Dictionary<int, TpeParameters>();
         private HashSet<int> running = new HashSet<int>();
-        private List<Result> results = new List<Result>();
+        private List<Result> history = new List<Result>();
         private double lie = Double.PositiveInfinity;
 
-        private static void print(double num)
+        public TpeTuner(SearchSpace searchSpace, bool minimizeMode = true)
         {
-            Console.WriteLine($"{num}");
-        }
-
-        private static void print(double[] array)
-        {
-            Console.WriteLine(string.Join(" ", array));
-        }
-
-        private static void cprint(bool cond, double val) { if (cond) print(val); }
-        private static void cprint(bool cond, double[] val) { if (cond) print(val); }
-
-        public TpeTuner(string jsonSearchSpace, bool minimizeMode = true)
-        {
-            JArray spaceArray = JArray.Parse(jsonSearchSpace);
-            JObject spaceJson = (JObject)spaceArray[0];
-
-            var space = new Dictionary<string, SearchRange>();
-            int groupIndex = 0;
-            foreach (var groupKV in spaceJson) {
-                foreach (var rangeKV in (JObject)groupKV.Value) {
-                    string tag = rangeKV.Key;
-                    JObject rangeJson = (JObject)rangeKV.Value;
-                    string type = (string)rangeJson["_type"];
-                    JArray values = (JArray)rangeJson["_value"];
-                    if (type == "uniform") {
-                        space[tag] = SearchRange.Numerical(groupIndex, (double)values[0], (double)values[1], false, false);
-                    } else if (type == "loguniform") {
-                        space[tag] = SearchRange.Numerical(groupIndex, (double)values[0], (double)values[1], true, false);
-                    } else if (type == "quniform") {
-                        space[tag] = SearchRange.Numerical(groupIndex, (double)values[0], (double)values[1], false, true);
-                    } else if (type == "qloguniform") {
-                        space[tag] = SearchRange.Numerical(groupIndex, (double)values[0], (double)values[1], true, true);
-                    } else if (type == "choice") {
-                        space[tag] = SearchRange.Categorical(groupIndex, (int)values[0]);
-                    }
-                }
-                groupIndex += 1;
-            }
-
-            this.nGroup = groupIndex;
-            this.space = space;
-            this.minimize = minimizeMode;
-        }
-
-        public TpeTuner(int nGroup, Dictionary<string, SearchRange> searchSpace, bool minimizeMode = true)
-        {
-            this.nGroup = nGroup;
             this.space = searchSpace;
             this.minimize = minimizeMode;
         }
 
-        public Parameter GenerateParameters(int paramId)
+        public Parameters GenerateParameters(int parameterId)
         {
-            Parameter param;
-            if (paramHistory.Count > nStartupJobs && running.Count > 0) {
-                var fork = new List<Result>(results);
+            Parameters ret;
+            TpeParameters param;
+            if (parameters.Count > nStartupJobs && running.Count > 0) {
+                var fakeHistory = new List<Result>(history);
                 foreach (int id in running) {
-                    fork.Add(new Result(fork.Count, lie, paramHistory[id]));
+                    fakeHistory.Add(new Result(fakeHistory.Count, lie, parameters[id]));
                 }
-                param = TpeSuggest(fork);
+                (ret, param) = Suggest(space, fakeHistory);
             } else {
-                param = TpeSuggest(results);
+                (ret, param) = Suggest(space, history);
             }
-            paramHistory[paramId] = param;
-            running.Add(paramId);
-            return param;
+            parameters[parameterId] = param;
+            running.Add(parameterId);
+
+            //Console.WriteLine($"----- {parameterId} -----");
+            //foreach (var (key, val) in param) {
+            //    Console.WriteLine($"{key}: {val}");
+            //}
+
+            return ret;
         }
 
-        public void ReceiveTrialResult(int paramId, double loss)
+        public void ReceiveTrialResult(int parameterId, double loss)
         {
             if (!minimize) {
                 loss = -loss;
             }
-            running.Remove(paramId);
+            running.Remove(parameterId);
             lie = Math.Min(lie, loss);
-            results.Add(new Result(paramId, loss, paramHistory[paramId]));
+            history.Add(new Result(parameterId, loss, parameters[parameterId]));
         }
 
-        private Parameter TpeSuggest(List<Result> history)
+        private static (Parameters, TpeParameters) Suggest(SearchSpace space, List<Result> history)
+        {
+            Parameters ret = new Parameters();
+            TpeParameters param = new TpeParameters();
+
+            for (int i = 0; i < space.Count; i++) {
+                PipeParameters pipe = new PipeParameters();
+                ret.Add(pipe);
+
+                string tag = i.ToString();
+                int algoIndex = SuggestCategorical(history, tag, space[i].Count);
+                param[tag] = algoIndex;
+                AlgorithmSpace algoSpace = space[i][algoIndex];
+                pipe.algorithmName = algoSpace.name;
+
+                foreach (ParameterRange range in algoSpace) {
+                    if (range.isCategorical) {
+                        int index = SuggestCategorical(history, range.tag, range.size);
+                        param[range.tag] = index;
+                        pipe.parameters[range.name] = range.categoricalValues[index];
+                    } else {
+                        double x = SuggestNumerical(history, range.tag, range.low, range.high, range.isLogDistributed, range.isInteger);
+                        param[range.tag] = x;
+                        pipe.parameters[range.name] = range.isInteger ? ((int)x).ToString() : x.ToString();
+                    }
+                }
+            }
+
+            return (ret, param);
+        }
+
+        private static int SuggestCategorical(List<Result> history, string tag, int size)
         {
             if (history.Count < nStartupJobs) {
-                return RandomSuggest();
-            }
-            var param = new Parameter();
-            int groupIdx = Choice(history, "_group_", nGroup);
-
-            param["_group_"] = groupIdx;
-            foreach (var (tag, range) in space) {
-                if (groupIdx != range.groupIdx) { continue; }
-                if (range.categorical) {
-                    param[tag] = Choice(history, tag, range.size);
-                } else {
-                    param[tag] = Uniform(history, tag, range.low, range.high, range.log, range.integer);
-                }
+                return rng.Integer(size);
             }
 
-            //Console.WriteLine("####################");
-            //foreach (var (key, val) in param) {
-            //    Console.WriteLine($"{key}: {val}");
-            //}
-            //Environment.Exit(0);
-
-            return param;
-        }
-
-        private Parameter RandomSuggest()
-        {
-            var param = new Parameter();
-            int groupIdx = rng.randint(nGroup);
-            param["_group_"] = groupIdx;
-            foreach (var (tag, range) in space) {
-                if (groupIdx != range.groupIdx) { continue; }
-                if (range.categorical) {
-                    param[tag] = rng.randint(range.size);
-                } else {
-                    double val = rng.uniform(range.low, range.high);
-                    if (range.log) {
-                        val = Math.Exp(val);
-                    }
-                    if (range.integer) {
-                        val = Math.Round(val);
-                    }
-                    param[tag] = val;
-                }
-            }
-            return param;
-        }
-
-        private static int Choice(List<Result> results, string tag, int size)
-        {
-            var (obsBelow, obsAbove) = ApSplitTrials(results, tag);
+            var (obsBelow, obsAbove) = ApSplitTrials(history, tag);
 
             double[] weights = LinearForgettingWeights(obsBelow.Length);
             double[] counts = Bincount(obsBelow, weights, size);
-            double[] p = ArrayMath.Div(ArrayMath.Add(counts, priorWeight), ArrayMath.Sum(ArrayMath.Add(counts, priorWeight)));
-            int[] sample = Categorical(p, nEiCandidates);
+            double[] p = ArrayMath.DivSum(ArrayMath.Add(counts, priorWeight));
+            int[] sample = rng.Categorical(p, nEiCandidates);
             double[] belowLLik = ArrayMath.Log(ArrayMath.Index(p, sample));
 
             weights = LinearForgettingWeights(obsAbove.Length);
             counts = Bincount(obsAbove, weights, size);
-            p = ArrayMath.Div(ArrayMath.Add(counts, priorWeight), ArrayMath.Sum(ArrayMath.Add(counts, priorWeight)));
+            p = ArrayMath.DivSum(ArrayMath.Add(counts, priorWeight));
             double[] aboveLLik = ArrayMath.Log(ArrayMath.Index(p, sample));
 
             return FindBest(sample, belowLLik, aboveLLik);
         }
 
-        private static double Uniform(List<Result> results, string tag, double low, double high, bool log, bool integer)
+        private static double SuggestNumerical(List<Result> history, string tag, double low, double high, bool log, bool integer)
         {
-            var (obsBelow, obsAbove) = ApSplitTrials(results, tag);
+            if (history.Count < nStartupJobs) {
+                double x = rng.Uniform(low, high);
+                if (log) { x = Math.Exp(x); }
+                if (integer) { x = Math.Round(x); }
+                return x;
+            }
+
+            var (obsBelow, obsAbove) = ApSplitTrials(history, tag);
 
             if (log) {
                 obsBelow = ArrayMath.Log(obsBelow);
@@ -294,7 +153,6 @@ namespace Nni {
             var (weights, mus, sigmas) = AdaptiveParzenNormal(obsBelow, priorMu, priorSigma);
             double[] samples = Gmm1(weights, mus, sigmas, low, high, log, integer);
             double[] belowLLik = Gmm1Lpdf(samples, weights, mus, sigmas, low, high, log, integer);
-            //cprint(log && integer, belowLLik);
 
             (weights, mus, sigmas) = AdaptiveParzenNormal(obsAbove, priorMu, priorSigma);
             double[] aboveLLik = Gmm1Lpdf(samples, weights, mus, sigmas, low, high, log, integer);
@@ -302,10 +160,10 @@ namespace Nni {
             return FindBest(samples, belowLLik, aboveLLik);
         }
 
-        private static (double[], double[]) ApSplitTrials(List<Result> results, string tag)
+        private static (double[], double[]) ApSplitTrials(List<Result> history, string tag)
         {
-            int nBelow = Math.Min((int)Math.Ceiling(olossGamma * Math.Sqrt(results.Count)), lf);
-            var sorted = results.OrderBy(result => result.loss);
+            int nBelow = Math.Min((int)Math.Ceiling(olossGamma * Math.Sqrt(history.Count)), lf);
+            var sorted = history.OrderBy(result => result.loss);
             var below = sorted.Take(nBelow).Where(result => result.param.ContainsKey(tag));
             var above = sorted.Skip(nBelow).Where(result => result.param.ContainsKey(tag));
             var belowValue = below.OrderBy(result => result.id).Select(result => result.param[tag]).ToArray();
@@ -361,15 +219,6 @@ namespace Nni {
             return (sortedWeights, sortedMus, sigma);
         }
 
-        private static int[] Categorical(double[] p, int size)
-        {
-            int[] ret = new int[size];
-            for (int i = 0; i < ret.Length; i++) {
-                ret[i] = rng.Categorical(p);
-            }
-            return ret;
-        }
-
         private static double[] LinearForgettingWeights(int n)
         {
             double[] weights = Enumerable.Repeat(1.0, n).ToArray();
@@ -377,10 +226,10 @@ namespace Nni {
             int rampLength= n - lf;
             if (rampLength == 1) {
                 weights[0] = rampStart;
-                return weights;
-            }
-            for (int i = 0; i < rampLength; i++) {
-                weights[i] = rampStart + (1.0 - rampStart) / (rampLength - 1) * i;
+            } else {
+                for (int i = 0; i < rampLength; i++) {
+                    weights[i] = rampStart + (1.0 - rampStart) / (rampLength - 1) * i;
+                }
             }
             return weights;
         }
@@ -391,7 +240,7 @@ namespace Nni {
             for (int i = 0; i < nEiCandidates; i++) {
                 while (true) {
                     int active = rng.Categorical(weights);
-                    double draw = rng.normal(mus[active], sigmas[active]);
+                    double draw = rng.Normal(mus[active], sigmas[active]);
                     if (draw < low || draw >= high) { continue; }
 
                     if (log) { draw = Math.Exp(draw); }
@@ -405,7 +254,7 @@ namespace Nni {
 
         private static double[] Gmm1Lpdf(double[] samples, double[] weights, double[] mus, double[] sigmas, double low, double high, bool log, bool integer)
         {
-            double pAccept = ArrayMath.Sum(ArrayMath.Mul(weights, ArrayMath.Sub(NormalCdf(high, mus, sigmas), NormalCdf(low, mus, sigmas))));
+            double pAccept = ArrayMath.Mul(weights, ArrayMath.Sub(NormalCdf(high, mus, sigmas), NormalCdf(low, mus, sigmas))).Sum();
 
             double[] ret = new double[samples.Length];
             for (int i = 0; i < samples.Length; i++) {
@@ -505,5 +354,4 @@ namespace Nni {
             return ret;
         }
     }
-
 }
