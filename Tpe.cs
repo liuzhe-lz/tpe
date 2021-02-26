@@ -80,7 +80,7 @@ namespace Nni
 
         private static (Parameters, TpeParameters) Suggest(SearchSpace space, List<Result> history)
         {
-            Parameters formatedParam = new Parameters();
+            Parameters formattedParam = new Parameters();
             TpeParameters param = new TpeParameters();
 
             int pipelineIndex = SuggestCategorical(history, "__pipeline__", space.pipelines.Count);
@@ -88,24 +88,24 @@ namespace Nni
 
             foreach (AlgorithmSpace algo in space.algorithms.Values) {
                 if (chosenPipeline.Contains(algo.name)) {
-                    var formatedAlgo = new AlgorithmParameters();
-                    formatedParam[algo.name] = formatedAlgo;
+                    var formattedAlgo = new AlgorithmParameters();
+                    formattedParam[algo.name] = formattedAlgo;
 
                     foreach (ParameterRange range in algo) {
                         if (range.isCategorical) {
                             int index = SuggestCategorical(history, range.tag, range.size);
                             param[range.tag] = index;
-                            formatedAlgo[range.name] = range.categoricalValues[index];
+                            formattedAlgo[range.name] = range.categoricalValues[index];
                         } else {
                             double x = SuggestNumerical(history, range.tag, range.low, range.high, range.isLogDistributed, range.isInteger);
                             param[range.tag] = x;
-                            formatedAlgo[range.name] = range.isInteger ? ((int)x).ToString() : x.ToString();
+                            formattedAlgo[range.name] = range.isInteger ? ((int)x).ToString() : x.ToString();
                         }
                     }
                 }
             }
 
-            return (formatedParam, param);
+            return (formattedParam, param);
         }
 
         private static int SuggestCategorical(List<Result> history, string tag, int size)
