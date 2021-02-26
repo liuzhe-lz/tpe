@@ -12,27 +12,43 @@ namespace cs
             string searchSpaceJson = @"
                 [
                     {
-                        '0_0': {},
-                        '0_1': {}
-                    },
-                    {
-                        '1_0': {}
-                    },
-                    {
-                        'model1': {
-                            'batch_size': { '_type': 'quniform', '_value': [ 16, 32 ] },
-                            'conv_size': { '_type': 'choice', '_value': [ 2, 3, 5, 7 ] },
-                            'dropout_rate': { '_type': 'uniform', '_value': [ 0.5, 0.9 ] },
-                            'hidden_size': { '_type': 'qloguniform', '_value': [ 32, 1024 ] },
-                            'learning_rate': { '_type': 'loguniform', '_value': [ 0.0001, 0.1 ] }
+                        'A': {
+                            'A_param1': { '_type': 'choice', '_value': [ 'x', 'y' ] },
+                            'A_param2': { '_type': 'uniform', '_value': [ 0, 1 ] }
                         },
-                        'model2': {
-                            'test1': { '_type': 'choice', '_value': [ 'a', 'b' ] },
-                            'test2': { '_type': 'uniform', '_value': [ 0, 1 ] }
+                        'B': {
+                            'B_param': { '_type': 'loguniform', '_value': [ 0.0001, 0.1 ] }
+                        },
+                        'C': {
+                            'C_param': { '_type': 'quniform', '_value': [ 16, 32 ] }
+                        },
+                        'F': {
+                            'F_param': { '_type': 'qloguniform', '_value': [ 32, 1024 ] }
+                        },
+                        'G': {
+                            'G_param': { '_type': 'choice', '_value': [ 'g1', 'g2' ] }
                         }
+                    },
+                    {
+                        'A': { 'A_param1': { '_type': 'choice', '_value': [ 'x', 'y' ] }, 'A_param2': { '_type': 'uniform', '_value': [ 0, 1 ] } },
+                        'B': { 'B_param': { '_type': 'loguniform', '_value': [ 0.0001, 0.1 ] } },
+                        'C': { 'C_param': { '_type': 'quniform', '_value': [ 16, 32 ] } },
+                        'F': { 'F_param': { '_type': 'qloguniform', '_value': [ 32, 1024 ] } },
+                        'H': { 'H_param': { '_type': 'choice', '_value': [ 'h1', 'h2' ] } }
+                    },
+                    {
+                        'A': { 'A_param1': { '_type': 'choice', '_value': [ 'x', 'y' ] }, 'A_param2': { '_type': 'uniform', '_value': [ 0, 1 ] } },
+                        'D': { 'D_param': { '_type': 'choice', '_value': [ 'd1', 'd2' ] } },
+                        'F': { 'F_param': { '_type': 'qloguniform', '_value': [ 32, 1024 ] } },
+                        'G': { 'G_param': { '_type': 'choice', '_value': [ 'g1', 'g2' ] } }
+                    },
+                    {
+                        'A': { 'A_param1': { '_type': 'choice', '_value': [ 'x', 'y' ] }, 'A_param2': { '_type': 'uniform', '_value': [ 0, 1 ] } },
+                        'D': { 'D_param': { '_type': 'choice', '_value': [ 'd1', 'd2' ] } },
+                        'F': { 'F_param': { '_type': 'qloguniform', '_value': [ 32, 1024 ] } },
+                        'H': { 'H_param': { '_type': 'choice', '_value': [ 'h1', 'h2' ] } }
                     }
-                ]
-            ";
+                ]";
 
             var space = new SearchSpace(searchSpaceJson);
             var tuner = new TpeTuner(space);
@@ -49,9 +65,9 @@ namespace cs
                 }
 
                 Console.WriteLine($"===== {idx} =====");
-                for (int k = 0; k < param.Count; k++) {
-                    Console.WriteLine($"{k}: {param[k].algorithmName}");
-                    foreach (var (key, val) in param[k].parameters) {
+                foreach (var (algoName, algoParams) in param) {
+                    Console.WriteLine(algoName);
+                    foreach (var (key, val) in algoParams) {
                         Console.WriteLine($"    {key}: {val}");
                     }
                 }

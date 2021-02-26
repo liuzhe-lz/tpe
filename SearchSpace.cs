@@ -5,28 +5,31 @@ using Newtonsoft.Json.Linq;
 
 namespace Nni
 {
-    class Parameters : List<PipeParameters> { }
+    class Parameters : Dictionary<string, AlgorithmParameters> { }
 
-    class PipeParameters {
-        public string algorithmName;
-        public Dictionary<string, string> parameters = new Dictionary<string, string>();
-    }
+    class AlgorithmParameters : Dictionary<string, string> { }
 
 
-    class SearchSpace : List<PipeSpace>
+    class SearchSpace
     {
+        // in example: { 'A': search_space_A, 'B': search_space_B }
+        public Dictionary<string, AlgorithmSpace> algorithms = new Dictionary<string, AlgorithmSpace>();
+
+        // in example: [ ['A','B','C','F','G'], ['A','B','C','F','H'], ... ]
+        public List<List<string>> pipelines = new List<List<string>>();
+
         public SearchSpace(string jsonString)
         {
-            int pipeIndex = -1;
-            foreach (var pipeJson in JArray.Parse(jsonString)) {
-                pipeIndex += 1;
-                var pipe = new PipeSpace();
-                Add(pipe);
+            foreach (var pipelineJson in JArray.Parse(jsonString)) {
+                var pipeline = new List<string>();
+                pipelines.Add(pipeline);
 
-                foreach (var algoKV in (JObject)pipeJson) {
+                foreach (var algoKV in (JObject)pipelineJson) {
+                    pipeline.Add(algoKV.Key);
+
                     var algo = new AlgorithmSpace();
-                    pipe.Add(algo);
                     algo.name = algoKV.Key;
+                    algorithms[algo.name] = algo;
 
                     foreach (var paramKV in (JObject)algoKV.Value) {
                         string paramName = paramKV.Key;
@@ -39,7 +42,7 @@ namespace Nni
                             foreach (var val in (JArray)paramJson["_value"]) {
                                 values.Add((string)val);
                             }
-                            algo.Add(ParameterRange.Categorical(pipeIndex, algo.name, paramName, values.ToArray()));
+                            algo.Add(ParameterRange.Categorical(algo.name, paramName, values.ToArray()));
 
                         } else {
                             JArray values = (JArray)paramJson["_value"];
@@ -49,15 +52,13 @@ namespace Nni
                             bool log = (type == "loguniform" || type == "qloguniform");
                             bool integer = (type == "quniform" || type == "qloguniform");
 
-                            algo.Add(ParameterRange.Numerical(pipeIndex, algo.name, paramName, low, high, log, integer));
+                            algo.Add(ParameterRange.Numerical(algo.name, paramName, low, high, log, integer));
                         }
                     }
                 }
             }
         }
     }
-
-    class PipeSpace : List<AlgorithmSpace> { }
 
     class AlgorithmSpace : List<ParameterRange>
     {
@@ -81,33 +82,33 @@ namespace Nni
         public bool isLogDistributed;
         public bool isInteger;
 
-        public static ParameterRange Categorical(int pipeIndex, string algorithmName, string name, string[] values)
+        public static ParameterRange Categorical(string algorithmName, string name, string[] values)
         {
             return new ParameterRange(
-                name, pipeIndex, algorithmName, true,
+                name, algorithmName, true,
                 values.Length, values,
                 Double.NaN, Double.NaN, false, false
             );
         }
 
         public static ParameterRange Numerical(
-            int pipeIndex, string algorithmName, string name,
+            string algorithmName, string name,
             double low, double high, bool isLogDistributed = false, bool isInteger = false)
         {
             return new ParameterRange(
-                name, pipeIndex, algorithmName, false,
+                name, algorithmName, false,
                 -1, null,
                 low, high, isLogDistributed, isInteger
             );
         }
 
         private ParameterRange(
-            string name, int pipeIndex, string algorithmName, bool isCategorical,
+            string name, string algorithmName, bool isCategorical,
             int size, string[] categoricalValues,
             double low, double high, bool isLogDistributed, bool isInteger)
         {
             this.name = name;
-            this.tag = pipeIndex.ToString() + '|' + algorithmName + '|' + name;
+            this.tag = algorithmName + '|' + name;
 
             this.isCategorical = isCategorical;
 

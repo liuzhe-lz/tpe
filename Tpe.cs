@@ -80,33 +80,32 @@ namespace Nni
 
         private static (Parameters, TpeParameters) Suggest(SearchSpace space, List<Result> history)
         {
-            Parameters ret = new Parameters();
+            Parameters formatedParam = new Parameters();
             TpeParameters param = new TpeParameters();
 
-            for (int i = 0; i < space.Count; i++) {
-                PipeParameters pipe = new PipeParameters();
-                ret.Add(pipe);
+            int pipelineIndex = SuggestCategorical(history, "__pipeline__", space.pipelines.Count);
+            var chosenPipeline = space.pipelines[pipelineIndex];
 
-                string tag = i.ToString();
-                int algoIndex = SuggestCategorical(history, tag, space[i].Count);
-                param[tag] = algoIndex;
-                AlgorithmSpace algoSpace = space[i][algoIndex];
-                pipe.algorithmName = algoSpace.name;
+            foreach (AlgorithmSpace algo in space.algorithms.Values) {
+                if (chosenPipeline.Contains(algo.name)) {
+                    var formatedAlgo = new AlgorithmParameters();
+                    formatedParam[algo.name] = formatedAlgo;
 
-                foreach (ParameterRange range in algoSpace) {
-                    if (range.isCategorical) {
-                        int index = SuggestCategorical(history, range.tag, range.size);
-                        param[range.tag] = index;
-                        pipe.parameters[range.name] = range.categoricalValues[index];
-                    } else {
-                        double x = SuggestNumerical(history, range.tag, range.low, range.high, range.isLogDistributed, range.isInteger);
-                        param[range.tag] = x;
-                        pipe.parameters[range.name] = range.isInteger ? ((int)x).ToString() : x.ToString();
+                    foreach (ParameterRange range in algo) {
+                        if (range.isCategorical) {
+                            int index = SuggestCategorical(history, range.tag, range.size);
+                            param[range.tag] = index;
+                            formatedAlgo[range.name] = range.categoricalValues[index];
+                        } else {
+                            double x = SuggestNumerical(history, range.tag, range.low, range.high, range.isLogDistributed, range.isInteger);
+                            param[range.tag] = x;
+                            formatedAlgo[range.name] = range.isInteger ? ((int)x).ToString() : x.ToString();
+                        }
                     }
                 }
             }
 
-            return (ret, param);
+            return (formatedParam, param);
         }
 
         private static int SuggestCategorical(List<Result> history, string tag, int size)
