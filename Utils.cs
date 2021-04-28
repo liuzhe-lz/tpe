@@ -4,21 +4,47 @@ using System.Linq;
 namespace Nni {
     class RandomNumberGenerator
     {
-        private Random random;
+        //private Random random;
+
+        //public RandomNumberGenerator(int seed = 0)
+        //{
+        //    random = new Random(seed);
+        //}
+
+        //public int Integer(int high)
+        //{
+        //    return random.Next(high);
+        //}
+
+        //public double Uniform(double low, double high)
+        //{
+        //    return random.NextDouble() * (high - low) + low;
+        //}
+
+        private long a = 1103515245;
+        private long c = 12345;
+        private long m = (long)1 << 31;
+        public long seed;
 
         public RandomNumberGenerator(int seed = 0)
         {
-            random = new Random(seed);
+            this.seed = seed;
+        }
+
+        private long Rand()
+        {
+            seed = (a * seed + c) % m;
+            return seed;
         }
 
         public int Integer(int high)
         {
-            return random.Next(high);
+            return (int)(Rand() % high);
         }
 
         public double Uniform(double low, double high)
         {
-            return random.NextDouble() * (high - low) + low;
+            return (double)Rand() / m * (high - low) + low;
         }
 
         public double Normal(double location, double scale)
@@ -27,6 +53,15 @@ namespace Nni {
             double v = 1 - Uniform(0, 1);
             double std = Math.Sqrt(-2.0 * Math.Log(u)) * Math.Sin(2.0 * Math.PI * v);
             return location + std * scale;
+        }
+
+        public double[] Normal(double location, double scale, int size)
+        {
+            double[] ret = new double[size];
+            for (int i = 0; i < size; i++) {
+                ret[i] = Normal(location, scale);
+            }
+            return ret;
         }
 
         public int Categorical(double[] possibility)
@@ -115,9 +150,24 @@ namespace Nni {
         }
 
         /* x * y */
+        public static double[] Mul(double[] xArray, double y)
+        {
+            return xArray.Select(x => x * y).ToArray();
+        }
+
         public static double[] Mul(double[] xArray, double[] yArray)
         {
             return Enumerable.Zip(xArray, yArray, (x, y) => x * y).ToArray();
+        }
+
+        /* np.linalg.norm */
+        public static double Norm(double[] array)
+        {
+            double s = 0;
+            foreach (double x in array) {
+                s += x * x;
+            }
+            return Math.Sqrt(s);
         }
 
         /* np.searchsorted */
@@ -139,4 +189,8 @@ namespace Nni {
             return Enumerable.Zip(xArray, yArray, (x, y) => x - y).ToArray();
         }
     }
+
+    //class Printer {
+    //    public static PrintDict
+    //}
 }

@@ -9,7 +9,6 @@ namespace Nni
 
     class AlgorithmParameters : Dictionary<string, string> { }
 
-
     class SearchSpace
     {
         // in example: { 'A': search_space_A, 'B': search_space_B }
@@ -120,10 +119,10 @@ namespace Nni
             this.isLogDistributed = isLogDistributed;
             this.isInteger = isInteger;
 
-            if (isLogDistributed) {
-                this.high = Math.Log(this.high);
-                this.low = Math.Log(this.low);
-            }
+            //if (isLogDistributed) {
+            //    this.high = Math.Log(this.high);
+            //    this.low = Math.Log(this.low);
+            //}
         }
     }
 }
