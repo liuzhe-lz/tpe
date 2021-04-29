@@ -7,124 +7,85 @@ namespace Nni
     class FlamlParameters : Dictionary<string, double>
     {
         public FlamlParameters() { }
-        public FlamlParameters(FlamlParameters p) : base(p) { }
+        public FlamlParameters(FlamlParameters copy) : base(copy) { }
     }
 
-    class FlamlTuner
+    class Flaml
     {
         private const double stepSize = 0.1;
         private const double stepLowerBound = 0.0001;
 
         public static RandomNumberGenerator rng = new RandomNumberGenerator();
 
-        private ParameterRange[] space;
+        private Domain[] space;
         private bool minimize;
 
-        private int numComplete4Incumbent = 0;
+        private FlamlParameters bestConfig;
+        private double? bestObj = null;
+        private Dictionary<int, FlamlParameters> configs = new Dictionary<int, FlamlParameters>();
         private double costComplete4Incumbent = 0;
         private double? costIncumbent = null;
-        private FlamlParameters incumbent;
         private int dim;
-        private int numAllowed4Incumbent = 0;
         private double[] directionTried = null;
-        private double step;
-        private Dictionary<int, FlamlParameters> proposedBy = new Dictionary<int, FlamlParameters>();
-        private Dictionary<int, FlamlParameters> configs = new Dictionary<int, FlamlParameters>();
-        private int trialCount = 1;
-        private double? bestObj = null;
-        private FlamlParameters bestConfig;
-        private int k = 0;
-        private int oldK = 0;
-        private double stepUpperBound;
+        private FlamlParameters incumbent;
         private int iterBestConfig = 1;
+        private int k = 0;
+        private int numAllowed4Incumbent = 0;
+        private int numComplete4Incumbent = 0;
+        private int oldK = 0;
+        private Dictionary<int, FlamlParameters> proposedBy = new Dictionary<int, FlamlParameters>();
+        private double step;
+        private double stepUpperBound;
+        private int trialCount = 1;
 
-        public FlamlTuner(ParameterRange[] searchSpace, FlamlParameters initConfig, bool minimizeMode = true)
+        public Flaml(Domain[] searchSpace, bool minimizeMode = true)
         {
             this.space = searchSpace;
             this.minimize = minimizeMode;
 
-            this.bestConfig = initConfig;
-            this.incumbent = this.Normalize(initConfig);
-            this.dim = searchSpace.Length;
-            this.numAllowed4Incumbent = 2 * this.dim;
-            this.step = stepSize * Math.Sqrt(this.dim);
-            this.stepUpperBound = Math.Sqrt(dim);
-            if (this.step > this.stepUpperBound) {
-                this.step = this.stepUpperBound;
+            bestConfig = GetInitialParameters();
+            incumbent = Normalize(bestConfig);
+            dim = space.Length;
+            numAllowed4Incumbent = 2 * dim;
+            step = stepSize * Math.Sqrt(dim);
+            stepUpperBound = Math.Sqrt(dim);
+            if (step > stepUpperBound) {
+                step = stepUpperBound;
             }
         }
 
-        private FlamlParameters Normalize(FlamlParameters config)
+        public Parameters GenerateParameters(int trialId)
         {
-            var normal = new FlamlParameters();
-            foreach (var range in this.space) {
-                string key = range.name;
-                double val = config[key];
-                if (range.isCategorical) {
-                    normal[key] = (val + 0.5) / range.size;
-                } else if (range.isLogDistributed) {
-                    normal[key] = Math.Log(val / range.low) / Math.Log(range.high / range.low);
-                } else {
-                    normal[key] = (val - range.low) / (range.high - range.low);
-                }
-            }
-            return normal;
-        }
-
-        private FlamlParameters Denormalize(FlamlParameters config)
-        {
-            var denormal = new FlamlParameters();
-            foreach (var range in this.space) {
-                string key = range.name;
-                double val = config[key];
-                if (range.isCategorical) {
-                    denormal[key] = Math.Floor(val * range.size);
-                } else if (range.isLogDistributed) {
-                    denormal[key] = Math.Pow(range.high / range.low, val) * range.low;
-                } else {
-                    denormal[key] = val * (range.high - range.low) + range.low;
-                }
-            }
-            return denormal;
-        }
-
-        public FlamlParameters GenerateParameters(int trialId)
-        {
-            this.numAllowed4Incumbent -= 1;
+            numAllowed4Incumbent -= 1;
             var move = new FlamlParameters(incumbent);
-            if (this.directionTried != null) {
-                for (int i = 0; i < this.space.Length; i++) {
-                    move[this.space[i].name] -= this.directionTried[i];
+            if (directionTried != null) {
+                for (int i = 0; i < space.Length; i++) {
+                    move[space[i].name] -= directionTried[i];
                 }
-                this.directionTried = null;
+                directionTried = null;
             }
-            this.directionTried = this.RandVectorSphere();
-            for (int i = 0; i < this.space.Length; i++) {
-                move[this.space[i].name] += this.directionTried[i];
+            directionTried = RandVectorSphere();
+            for (int i = 0; i < space.Length; i++) {
+                move[space[i].name] += directionTried[i];
             }
-            this.Project(move);
-            var config = this.Denormalize(move);
-            this.proposedBy[trialId] = this.incumbent;
-            this.configs[trialId] = config;
-            return config;
-        }
+            Project(move);
+            var config = Denormalize(move);
+            proposedBy[trialId] = incumbent;
+            configs[trialId] = config;
 
-        private double[] RandVectorSphere()
-        {
-            double[] vec = rng.Normal(0, 1, this.dim);
-            double mag = ArrayMath.Norm(vec);
-            return ArrayMath.Mul(vec, this.step / mag);
-        }
-
-        private void Project(FlamlParameters config)
-        {
-            foreach (var (key, val) in config) {
-                if (val < 0) {
-                    config[key] = 0;
-                } else if (val > 1) {
-                    config[key] = 1;
+            var ret = new Parameters();
+            foreach (var range in space) {
+                string key = range.name;
+                double val = config[key];
+                if (range.isCategorical) {
+                    ret[key] = range.categoricalValues[(int)Math.Round(val)];
+                } else if (range.isInteger) {
+                    ret[key] = ((int)Math.Round(val)).ToString();
+                } else {
+                    ret[key] = val.ToString();
                 }
             }
+            return ret;
         }
 
         public void ReceiveTrialResult(int trialId, double metric, double cost)
@@ -165,6 +126,67 @@ namespace Nni
                     if (numAllowed4Incumbent < 2) {
                         numAllowed4Incumbent = 2;
                     }
+                }
+            }
+        }
+
+        private FlamlParameters GetInitialParameters()
+        {
+            var param = new FlamlParameters();
+            foreach (var range in space) {
+                param[range.name] = range.initialValue;
+            }
+            return param;
+        }
+
+        private FlamlParameters Normalize(FlamlParameters config)
+        {
+            var normal = new FlamlParameters();
+            foreach (var range in space) {
+                string key = range.name;
+                double val = config[key];
+                if (range.isCategorical) {
+                    normal[key] = (val + 0.5) / range.size;
+                } else if (range.isLogDistributed) {
+                    normal[key] = Math.Log(val / range.low) / Math.Log(range.high / range.low);
+                } else {
+                    normal[key] = (val - range.low) / (range.high - range.low);
+                }
+            }
+            return normal;
+        }
+
+        private FlamlParameters Denormalize(FlamlParameters config)
+        {
+            var denormal = new FlamlParameters();
+            foreach (var range in space) {
+                string key = range.name;
+                double val = config[key];
+                if (range.isCategorical) {
+                    denormal[key] = Math.Floor(val * range.size);
+                } else if (range.isLogDistributed) {
+                    denormal[key] = Math.Pow(range.high / range.low, val) * range.low;
+                } else {
+                    denormal[key] = val * (range.high - range.low) + range.low;
+                }
+            }
+            return denormal;
+        }
+
+        private double[] RandVectorSphere()
+        {
+            double[] vec = rng.Normal(0, 1, dim);
+            double mag = ArrayMath.Norm(vec);
+            return ArrayMath.Mul(vec, step / mag);
+        }
+
+        private void Project(FlamlParameters config)
+        {
+            foreach (var (key, val) in config) {
+                if (val < 0) {
+                    config[key] = 0;
+                } else if (val > 1) {
+                    config[key] = 1;
                 }
             }
         }

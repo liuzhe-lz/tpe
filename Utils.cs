@@ -4,23 +4,24 @@ using System.Linq;
 namespace Nni {
     class RandomNumberGenerator
     {
-        //private Random random;
+        private Random random;
 
-        //public RandomNumberGenerator(int seed = 0)
-        //{
-        //    random = new Random(seed);
-        //}
+        public RandomNumberGenerator(int seed = 0)
+        {
+            random = new Random(seed);
+        }
 
-        //public int Integer(int high)
-        //{
-        //    return random.Next(high);
-        //}
+        public int Integer(int high)
+        {
+            return random.Next(high);
+        }
 
-        //public double Uniform(double low, double high)
-        //{
-        //    return random.NextDouble() * (high - low) + low;
-        //}
+        public double Uniform(double low, double high)
+        {
+            return random.NextDouble() * (high - low) + low;
+        }
 
+        /* debug rng
         private long a = 1103515245;
         private long c = 12345;
         private long m = (long)1 << 31;
@@ -46,6 +47,7 @@ namespace Nni {
         {
             return (double)Rand() / m * (high - low) + low;
         }
+        */
 
         public double Normal(double location, double scale)
         {

@@ -44,9 +44,9 @@ namespace Nni
             this.minimize = minimizeMode;
         }
 
-        public Parameters GenerateParameters(int parameterId)
+        public NestedParameters GenerateParameters(int parameterId)
         {
-            Parameters ret;
+            NestedParameters ret;
             TpeParameters param;
             if (parameters.Count > nStartupJobs && running.Count > 0) {
                 var fakeHistory = new List<Result>(history);
@@ -78,9 +78,9 @@ namespace Nni
             history.Add(new Result(parameterId, loss, parameters[parameterId]));
         }
 
-        private static (Parameters, TpeParameters) Suggest(SearchSpace space, List<Result> history)
+        private static (NestedParameters, TpeParameters) Suggest(SearchSpace space, List<Result> history)
         {
-            Parameters formattedParam = new Parameters();
+            NestedParameters formattedParam = new NestedParameters();
             TpeParameters param = new TpeParameters();
 
             int pipelineIndex = SuggestCategorical(history, "__pipeline__", space.pipelines.Count);
@@ -88,10 +88,10 @@ namespace Nni
 
             foreach (AlgorithmSpace algo in space.algorithms.Values) {
                 if (chosenPipeline.Contains(algo.name)) {
-                    var formattedAlgo = new AlgorithmParameters();
+                    var formattedAlgo = new Parameters();
                     formattedParam[algo.name] = formattedAlgo;
 
-                    foreach (ParameterRange range in algo) {
+                    foreach (Domain range in algo) {
                         if (range.isCategorical) {
                             int index = SuggestCategorical(history, range.tag, range.size);
                             param[range.tag] = index;
