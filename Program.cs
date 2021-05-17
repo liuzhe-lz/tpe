@@ -27,8 +27,8 @@ namespace cs
                 foreach (var (name, val) in param) {
                     Console.WriteLine($"{name}: {val}");
                 }
-                double time = Flaml.rng.Uniform(0, 60);
-                double loss = Flaml.rng.Uniform(0, 1);
+                double time = Flow2.rng.Uniform(0, 60);
+                double loss = Flow2.rng.Uniform(0, 1);
 
                 searcher.ReceiveTrialResult(i, loss, time);
             }
