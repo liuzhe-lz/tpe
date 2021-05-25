@@ -1,5 +1,6 @@
 import numpy as np
 from flow2 import FLOW2
+from blendsearch import CFO
 from sample import (
     choice,
     lograndint,
@@ -25,11 +26,11 @@ space = {
     'hidden': lograndint(32, 1024),
 }
 
-searcher = FLOW2(
-    init_config,
+searcher = CFO(
+    low_cost_partial_config = init_config,
     metric = 'loss',
     space = space,
-    random = np.random.RandomState(20),
+    #random = np.random.RandomState(20),
 )
 
 configs = []
@@ -40,10 +41,12 @@ for i in range(100):
         'time_total_s': np.random.random() * 60,
         'loss': np.random.random(),
     }
+    for k, v in configs[-1].items():
+        result['config/' + k] = v
     searcher.on_trial_complete(str(i), result)
 
 for i in range(10):
     print(configs[i * 10 + 9])
 
-assert configs[9] == {'batch': 32, 'conv': 3, 'dropout': 0.5803017700282026, 'lr': 0.00029272264078005763, 'hidden': 136}
-print('OK')
+#assert configs[9] == {'batch': 32, 'conv': 3, 'dropout': 0.5803017700282026, 'lr': 0.00029272264078005763, 'hidden': 136}
+#print('OK')

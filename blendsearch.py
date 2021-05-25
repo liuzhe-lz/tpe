@@ -8,10 +8,10 @@ import numpy as np
 import time
 import pickle
 
-from .suggestion import Searcher, OptunaSearch as GlobalSearch
-from .variant_generator import generate_variants
-from .search_thread import SearchThread
-from .flow2 import FLOW2 as LocalSearch
+from suggestion import Searcher, OptunaSearch as GlobalSearch
+from variant_generator import generate_variants
+from search_thread import SearchThread
+from flow2 import FLOW2 as LocalSearch
 
 import logging
 logger = logging.getLogger(__name__)
@@ -38,55 +38,6 @@ class BlendSearch(Searcher):
                  global_search_alg: Optional[Searcher] = None,
                  mem_size = None, 
                  seed: Optional[int] = 20):
-        '''Constructor
-
-        Args:
-            metric: A string of the metric name to optimize for.
-                minimization or maximization.
-            mode: A string in ['min', 'max'] to specify the objective as
-            space: A dictionary to specify the search space.
-            points_to_evaluate: Initial parameter suggestions to be run first. 
-            low_cost_partial_config: A dictionary from a subset of 
-                controlled dimensions to the initial low-cost values.
-                e.g., 
-
-                .. code-block:: python
-
-                    {'n_estimators': 4, 'max_leaves': 4}
-                
-            cat_hp_cost: A dictionary from a subset of categorical dimensions
-                to the relative cost of each choice. 
-                e.g.,
-                
-                .. code-block:: python
-
-                    {'tree_method': [1, 1, 2]}
-                
-                i.e., the relative cost of the 
-                three choices of 'tree_method' is 1, 1 and 2 respectively.
-            prune_attr: A string of the attribute used for pruning. 
-                Not necessarily in space.
-                When prune_attr is in space, it is a hyperparameter, e.g., 
-                    'n_iters', and the best value is unknown.
-                When prune_attr is not in space, it is a resource dimension, 
-                    e.g., 'sample_size', and the peak performance is assumed
-                    to be at the max_resource.
-            min_resource: A float of the minimal resource to use for the 
-                prune_attr; only valid if prune_attr is not in space.
-            max_resource: A float of the maximal resource to use for the 
-                prune_attr; only valid if prune_attr is not in space.
-            reduction_factor: A float of the reduction factor used for
-                incremental pruning.
-            resources_per_trial: A dictionary of the resources permitted per
-                trial, such as 'mem'.
-            global_search_alg: A Searcher instance as the global search
-                instance. If omitted, Optuna is used. The following algos have
-                known issues when used as global_search_alg:
-                - HyperOptSearch raises exception sometimes
-                - TuneBOHB has its own scheduler
-            mem_size: A function to estimate the memory size for a given config.
-            seed: An integer of the random seed.
-        '''
         self._metric, self._mode = metric, mode
         init_config = low_cost_partial_config or {}
         self._points_to_evaluate = points_to_evaluate or []
@@ -126,10 +77,7 @@ class BlendSearch(Searcher):
         '''initialize the search
         '''
         self._metric_target = np.inf * self._ls.metric_op
-        self._search_thread_pool = {
-            # id: int -> thread: SearchThread
-            0: SearchThread(self._ls.mode, self._gs)
-            } 
+        self._search_thread_pool = { 0: SearchThread(self._ls._mode, self._gs) } 
         self._thread_count = 1 # total # threads created
         self._init_used = self._ls.init_config is None
         self._trial_proposed_by = {} # trial_id: str -> thread_id: int
@@ -195,14 +143,13 @@ class BlendSearch(Searcher):
             if not thread_id and self._create_condition(result): 
                 # thread creator
                 self._search_thread_pool[self._thread_count] = SearchThread(
-                    self._ls.mode,
+                    self._ls._mode,
                     self._ls.create(config, result[self._metric], cost=result[
                         self.cost_attr])
                 )
                 thread_id = self._thread_count
                 self._thread_count += 1
-                self._update_admissible_region(config, self._ls_bound_min,
-                    self._ls_bound_max)
+                self._update_admissible_region(config, self._ls_bound_min, self._ls_bound_max)
             # reset admissible region to ls bounding box
             self._gs_admissible_min.update(self._ls_bound_min)
             self._gs_admissible_max.update(self._ls_bound_max)
@@ -429,7 +376,7 @@ class BlendSearch(Searcher):
         return True
 
 
-class CFO(BlendSearchTuner):
+class CFO(BlendSearch):
     ''' class for CFO algorithm
     '''
 

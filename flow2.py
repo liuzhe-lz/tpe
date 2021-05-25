@@ -78,7 +78,7 @@ class FLOW2:
         elif self._mode == "min":
             self.metric_op = 1.
         self.space = space or {}
-        self._random = random
+        self._random = random if random is not None else np.random.RandomState()
         self.init_config = init_config
         self.best_config = init_config
         self.cat_hp_cost = cat_hp_cost
@@ -452,3 +452,40 @@ class FLOW2:
             value = config[key]
             config[key] = max(0, min(1, value))
         if self._resource: config[self.prune_attr] = self._resource
+
+
+
+    def config_signature(self, config) -> tuple:
+        config = flatten_dict(config)
+        value_list = []
+        for key in self._space_keys:
+            if key in config:
+                value = config[key]
+                if key == self.prune_attr:
+                    value_list.append(value)
+                elif callable(getattr(self.space[key], 'sample', None)):
+                    if isinstance(self.space[key], sample.Integer):
+                        value_list.append(int(round(value)))
+                    else:
+                        value_list.append(value)
+            else:
+                value_list.append(None)
+        return tuple(value_list)
+
+    def create(self, init_config: Dict, obj: float, cost: float):
+        flow2 = FLOW2(
+            init_config,
+            self._metric,
+            self._mode, self._cat_hp_cost,
+            unflatten_dict(self.space), self.prune_attr,
+            self.min_resource, self.max_resource,
+            self.resource_multiple_factor)
+        flow2.best_obj = obj * self.metric_op  # minimize internally
+        flow2.cost_incumbent = cost
+        return flow2
+
+    @property
+    def converged(self) -> bool:
+        if self._num_complete4incumbent < self.dir - 2:
+            return False
+        return self.step < self.step_lower_bound
